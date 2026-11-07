@@ -56,6 +56,7 @@ function jr(){const E=[],A=(d,l,dr,cr,a)=>{if(a)E.push({d:d||'',l,dr,cr,a})};
  S.wg.forEach(w=>A(w.d,'أجر '+nm(S.wk,w.wk),'631','53',w.amt));
  S.ord.forEach(o=>{if(o.st=='delivered'){A(o.dd,'بيع: '+(o.cust||'زبون'),'53','70',o.up*o.qty);A(o.dd,'تكلفة بضاعة مباعة','600','30',o.cost||0)}
   if(o.ship&&(o.st=='delivered'||o.st=='returned'))A(o.dd||o.rd,'شحن طلبية','624','53',o.ship);
+   if(o.ship&&o.st=='cancelled'&&o.cs)A(o.cd,'شحن طلبية ملغاة بعد وصولها للزبون','624','53',o.ship);
   if(o.st=='returned'&&o.dmg)A(o.rd,'بضاعة مرجوعة تالفة','600','30',o.cost||0)});
  return E.sort((a,b)=>String(a.d).localeCompare(String(b.d)))}
 let tab='dash',dsel=today(),tmp={comp:[],vr:[]};
@@ -67,8 +68,8 @@ const lines=o=>{const b=S.box.find(x=>x.id==o.box),m={};(b?b.comp:[]).forEach(c=
 function sync(o){const want=['confirmed','delivered'].includes(o.st)||(o.st=='returned'&&o.dmg);const m=lines(o);
  if(want&&!o.ded){let c=0;for(const k in m){const it=S.items.find(i=>i.id==k);if(it){it.qty-=m[k]*o.qty;c+=m[k]*o.qty*it.cost}}o.cost=c;o.ded=true}
  else if(!want&&o.ded){for(const k in m){const it=S.items.find(i=>i.id==k);if(it)it.qty+=m[k]*o.qty}o.ded=false}}
-function day(d){const del=S.ord.filter(o=>o.st=='delivered'&&o.dd==d),ret=S.ord.filter(o=>o.st=='returned'&&o.rd==d),sm=(a,f)=>a.reduce((x,y)=>x+f(y),0);
- const rev=sm(del,o=>o.up*o.qty),cogs=sm(del,o=>o.cost||0),sh=sm(del.concat(ret),o=>o.ship||0),dm=sm(ret.filter(o=>o.dmg),o=>o.cost||0),ex=sm(S.exp.filter(e=>e.d==d),e=>e.amt),wg=sm(S.wg.filter(w=>w.d==d),w=>w.amt);
+function day(d){const del=S.ord.filter(o=>o.st=='delivered'&&o.dd==d),ret=S.ord.filter(o=>o.st=='returned'&&o.rd==d),can=S.ord.filter(o=>o.st=='cancelled'&&o.cs&&o.cd==d),sm=(a,f)=>a.reduce((x,y)=>x+f(y),0);
+ const rev=sm(del,o=>o.up*o.qty),cogs=sm(del,o=>o.cost||0),sh=sm(del.concat(ret).concat(can),o=>o.ship||0),dm=sm(ret.filter(o=>o.dmg),o=>o.cost||0),ex=sm(S.exp.filter(e=>e.d==d),e=>e.amt),wg=sm(S.wg.filter(w=>w.d==d),w=>w.amt);
  return{del,ret,rev,cogs,sh,dm,ex,wg,net:rev-cogs-sh-dm-ex-wg}}
 
 function addPur(){const n=val('pn'),q=num('pq'),p=num('pp'),pm=$('#ppm').value,sp=$('#psp').value;
@@ -89,7 +90,7 @@ function saveOrd(){const b=S.box.find(x=>x.id==$('#ob').value),q=num('oq')||1;if
  const up=num('oup')>0?num('oup'):b.price+tmp.vr.reduce((a,v)=>a+v.pr,0);
  const o={id:uid(),d:val('od')||today(),cust:val('oc'),ph:val('oph'),box:b.id,qty:q,vr:tmp.vr,up,ship:num('osh'),co:val('oco'),st:'new',ded:false,cost:0};
  S.cfg.co=o.co;S.ord.push(o);tmp.vr=[];save();render()}
-function setSt(id,st){const o=S.ord.find(x=>x.id==id);if(st=='returned'||st=='cancelled'){o.rs=prompt('سبب الإرجاع أو الإلغاء؟')||'';o.dmg=st=='returned'&&confirm('هل البضاعة تالفة؟ (موافق = تالفة ولا تعود للمخزون)')}
+function setSt(id,st){const o=S.ord.find(x=>x.id==id);if(st=='returned'||st=='cancelled'){o.rs=prompt('سبب الإرجاع أو الإلغاء؟')||'';o.dmg=st=='returned'&&confirm('هل البضاعة تالفة؟ (موافق = تالفة ولا تعود للمخزون)');if(st=='cancelled'){o.cs=confirm('هل أُلغيت الطلبية بعد أن وصل المنتج إلى الزبون؟\nموافق = نعم، تُحتسب تكلفة الشحن عليك.\nإلغاء = لا، الإلغاء قبل تجهيزها وذهابها لمكتب التوصيل، فلا يُحتسب شيء.');o.cd=today()}}
  if(st=='returned')o.rd=today();if(st=='delivered')o.dd=today();o.st=st;sync(o);save();render()}
 function rm(k,id){if(!confirm('تأكيد الحذف؟'))return;if(k=='pur'){const p=S.pur.find(x=>x.id==id),it=S.items.find(i=>i.id==p.item);if(it)it.qty-=p.q}
  if(k=='ord'){const o=S.ord.find(x=>x.id==id);o.st='cancelled';sync(o)}S[k]=S[k].filter(x=>x.id!=id);save();render()}
@@ -147,7 +148,7 @@ ord(){return `<div class="card"><h2>طلبية جديدة</h2><div class="f">${f
  <h2>حالة خاصة (زيادة/نقصان في العلبة)</h2><div class="f">${sel('vi','المنتج',opt(S.items))}${fld('vq','الكمية (+زيادة / −نقص)','number')}${fld('vp','فرق السعر','number')}<button onclick="addVr()">إضافة</button></div>
  ${tmp.vr.map((v,i)=>`<div>• ${esc(nm(S.items,v.item))} ${v.q>0?'+':''}${v.q} | سعر ${v.pr>0?'+':''}${v.pr} <button class="d" onclick="tmp.vr.splice(${i},1);render()">×</button></div>`).join('')}
  <p><button class="p" onclick="saveOrd()">حفظ الطلبية</button></p></div>
- ${S.ord.slice().reverse().map(o=>`<div class="card"><b>${esc(o.cust||'بدون اسم')}</b> ${esc(o.ph||'')} — ${esc(nm(S.box,o.box))} × ${o.qty}<br><small class="n">${o.d} | ${fm(o.up)} للعلبة | شحن ${fm(o.ship||0)} ${o.co?'| '+esc(o.co):''}${o.vr.length?' | حالات خاصة: '+o.vr.map(v=>esc(nm(S.items,v.item))+' '+v.q).join('، '):''}${o.rs?' | السبب: '+esc(o.rs):''}</small><br>
+ ${S.ord.slice().reverse().map(o=>`<div class="card"><b>${esc(o.cust||'بدون اسم')}</b> ${esc(o.ph||'')} — ${esc(nm(S.box,o.box))} × ${o.qty}<br><small class="n">${o.d} | ${fm(o.up)} للعلبة | شحن ${fm(o.ship||0)} ${o.co?'| '+esc(o.co):''}${o.vr.length?' | حالات خاصة: '+o.vr.map(v=>esc(nm(S.items,v.item))+' '+v.q).join('، '):''}${o.rs?' | السبب: '+esc(o.rs):''}${o.st=='cancelled'&&o.cs?' | الشحن محتسب':''}</small><br>
  <select onchange="setSt('${o.id}',this.value)">${Object.keys(ST).map(k=>`<option value="${k}" ${k==o.st?'selected':''}>${ST[k]}</option>`).join('')}</select> ${dl('ord',o.id)}</div>`).join('')}`},
 box(){return `<div class="card"><h2>علبة جديدة</h2><div class="f">${fld('bn','اسم العلبة')}${fld('bp','سعر البيع','number')}</div><div class="f">${sel('bci','منتج',opt(S.items))}${fld('bcq','الكمية','number','value="1"')}<button onclick="addComp()">إضافة منتج</button></div>
  ${tmp.comp.map((c,i)=>`<div>• ${esc(nm(S.items,c.item))} × ${c.q} <button class="d" onclick="tmp.comp.splice(${i},1);render()">×</button></div>`).join('')}<p><button class="p" onclick="saveBox()">حفظ العلبة</button></p></div>
