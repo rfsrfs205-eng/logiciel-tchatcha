@@ -1,0 +1,175 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>لوجيسيال</title><link rel="manifest" href="manifest.json"><script src="https://accounts.google.com/gsi/client" async defer></script><link rel="icon" href="icon.svg"><meta name="theme-color" content="#0f6e56"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#f6f5f1;--c:#fff;--t:#1d1d1b;--m:#6b6a64;--b:#e2e0d8;--a:#0f6e56;--r:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--c:#201f1e;--t:#ecebe6;--m:#a3a199;--b:#34332f;--a:#3fbf9a;--r:#f2877f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161615;--c:#201f1e;--t:#ecebe6;--m:#a3a199;--b:#34332f;--a:#3fbf9a;--r:#f2877f;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--t);font:15px/1.6 system-ui,Tahoma,Arial,sans-serif;padding:0 12px 40px}
+h1{font-size:20px;margin:14px 0 8px}h2{font-size:16px;margin:18px 0 8px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:6px 0}nav button{white-space:nowrap}
+button{font:inherit;border:1px solid var(--b);background:var(--c);color:var(--t);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.on,button.p{background:var(--a);color:#fff;border-color:var(--a)}button.d{color:var(--r)}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px;margin:10px 0}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.k{background:var(--c);border:1px solid var(--b);border-radius:10px;padding:8px}.k small{color:var(--m);display:block}.k b{font-size:16px}
+label{display:block;font-size:13px;color:var(--m)}input,select,textarea{width:100%;font:inherit;padding:6px;margin-top:2px;border:1px solid var(--b);border-radius:8px;background:var(--bg);color:var(--t)}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:end}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--b);padding:5px 6px;text-align:right;white-space:nowrap}th{color:var(--m);font-weight:600}
+.neg{color:var(--r)}.pos{color:var(--a)}small.n{color:var(--m)}
+</style></head><body>
+<h1>لوجيسيال — إدارة المتجر</h1><div id="gb"></div><nav id="nav"></nav><div id="app"></div>
+<script>
+const K='logiciel_v1';
+let S={items:[],sup:[],pur:[],pay:[],exp:[],wk:[],wg:[],box:[],ord:[],cfg:{co:''},ts:{}};
+try{const r=localStorage.getItem(K);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+let CL=null,cuid=null,pt=null,lastSync={},dirty=new Set();
+const shardsOf=()=>{const o={cfg:{v:S.cfg}};['items','sup','pur','pay','exp','wk','wg','box'].forEach(k=>o[k]={v:S[k]});S.ord.forEach(x=>{const k='ord_'+(x.d||'0000-00').slice(0,7);(o[k]=o[k]||{v:[]}).v.push(x)});return o};
+Object.entries(shardsOf()).forEach(([k,v])=>lastSync[k]=JSON.stringify(v));
+const loc=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+function save(){const c=shardsOf();for(const k in c){const j=JSON.stringify(c[k]);if(lastSync[k]!==j){lastSync[k]=j;S.ts[k]=Date.now();dirty.add(k)}}loc();clearTimeout(pt);pt=setTimeout(push,1500);autoSched()}
+const put=async k=>{const sh=shardsOf()[k];await CL.collection('data/users/'+cuid).doc(k).set({v:sh?sh.v:[],ts:S.ts[k]})};
+function setCloud(s){const e=document.querySelector('#cs');if(e)e.textContent=s||(CL?'☁ متصل بالسحابة':'محلي فقط')}
+async function push(){if(!CL||!dirty.size)return;setCloud('جارٍ المزامنة…');try{for(const k of [...dirty]){await put(k);dirty.delete(k)}setCloud()}catch(e){setCloud('تعذّرت المزامنة، البيانات محفوظة محليًا')}}
+function applyShard(k,v){if(k=='cfg')S.cfg=v;else if(k.startsWith('ord_'))S.ord=S.ord.filter(o=>'ord_'+(o.d||'0000-00').slice(0,7)!=k).concat(v);else if(['items','sup','pur','pay','exp','wk','wg','box'].includes(k))S[k]=v}
+async function pull(){if(!CL)return alert('المزامنة السحابية غير متاحة في هذا العرض. سجّل الدخول إلى claude.ai وافتح الرابط بحسابك.');setCloud('جارٍ المزامنة…');
+ try{const sn=await CL.collection('data/users/'+cuid).get(),rem={};sn.docs.forEach(d=>rem[d.id]=d.data());let ch=false;
+ for(const k in rem)if((rem[k].ts||0)>(S.ts[k]||0)){applyShard(k,rem[k].v);S.ts[k]=rem[k].ts;ch=true}
+ const c=shardsOf();for(const k in c){lastSync[k]=JSON.stringify(c[k]);if(!rem[k]||(S.ts[k]||0)>(rem[k].ts||0)){if(!S.ts[k])S.ts[k]=Date.now();await put(k)}}
+ loc();setCloud();if(ch)render()}catch(e){setCloud('تعذّرت المزامنة، البيانات محفوظة محليًا')}}
+const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9),today=()=>new Date().toISOString().slice(0,10);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fm=n=>(Math.round(n*100)/100).toLocaleString('en-US')+' د.ج';
+const val=i=>$('#'+i).value.trim(),num=i=>parseFloat($('#'+i).value)||0;
+const opt=(a,k='name')=>a.map(x=>`<option value="${x.id}">${esc(x[k])}</option>`).join('');
+const fld=(id,l,t='text',x='')=>`<label>${l}<input id="${id}" type="${t}" ${x}></label>`;
+const sel=(id,l,o)=>`<label>${l}<select id="${id}">${o}</select></label>`;
+const tbl=(h,r)=>`<div class="w"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;
+const nm=(a,id)=>(a.find(x=>x.id==id)||{name:'؟'}).name;
+const dl=(k,id)=>`<button class="d" onclick="rm('${k}','${id}')">حذف</button>`;
+const ST={new:'جديدة',confirmed:'مؤكدة',delivered:'مسلّمة',returned:'مرجوعة',cancelled:'ملغاة'};
+// SCF reference codes (to be verified against the official SCF chart of accounts)
+const SCF=[['600','مشتريات بضائع'],['613','إيجار'],['623','إشهار'],['624','نقل وشحن'],['627','خدمات بنكية'],['62','خدمات خارجية أخرى']];
+const AC={'30':'مخزون البضائع','53':'الصندوق','401':'الموردون','70':'مبيعات البضائع','600':'مشتريات بضائع مستهلكة','613':'إيجار','623':'إشهار','624':'نقل وشحن','627':'خدمات بنكية','62':'خدمات خارجية أخرى','631':'أجور'};
+function jr(){const E=[],A=(d,l,dr,cr,a)=>{if(a)E.push({d:d||'',l,dr,cr,a})};
+ S.pur.forEach(p=>A(p.d,'شراء '+nm(S.items,p.item),'30',p.pm=='cash'?'53':'401',p.q*p.p));
+ S.pay.forEach(p=>A(p.d,'دفعة للمورد '+nm(S.sup,p.sup),'401','53',p.amt));
+ S.exp.forEach(e=>A(e.d,'مصروف: '+(e.ds||e.cat),(e.cat.split('—')[1]||'62').trim(),e.pm=='cash'?'53':'401',e.amt));
+ S.wg.forEach(w=>A(w.d,'أجر '+nm(S.wk,w.wk),'631','53',w.amt));
+ S.ord.forEach(o=>{if(o.st=='delivered'){A(o.dd,'بيع: '+(o.cust||'زبون'),'53','70',o.up*o.qty);A(o.dd,'تكلفة بضاعة مباعة','600','30',o.cost||0)}
+  if(o.ship&&(o.st=='delivered'||o.st=='returned'))A(o.dd||o.rd,'شحن طلبية','624','53',o.ship);
+  if(o.st=='returned'&&o.dmg)A(o.rd,'بضاعة مرجوعة تالفة','600','30',o.cost||0)});
+ return E.sort((a,b)=>String(a.d).localeCompare(String(b.d)))}
+let tab='dash',dsel=today(),tmp={comp:[],vr:[]};
+const TABS=[['dash','لوحة التحكم'],['ord','الطلبيات'],['box','العلب'],['stk','المشتريات والمخزون'],['sup','الموردون'],['exp','المصاريف والعمال'],['jrn','دفتر اليومية'],['bk','نسخة احتياطية']];
+
+const supBal=id=>S.pur.filter(p=>p.sup==id&&p.pm=='credit').reduce((a,p)=>a+p.q*p.p,0)+S.exp.filter(e=>e.sup==id&&e.pm=='credit').reduce((a,e)=>a+e.amt,0)-S.pay.filter(p=>p.sup==id).reduce((a,p)=>a+p.amt,0);
+const boxCost=b=>b.comp.reduce((a,c)=>a+c.q*((S.items.find(i=>i.id==c.item)||{}).cost||0),0);
+const lines=o=>{const b=S.box.find(x=>x.id==o.box),m={};(b?b.comp:[]).forEach(c=>m[c.item]=(m[c.item]||0)+c.q);o.vr.forEach(v=>m[v.item]=(m[v.item]||0)+v.q);return m};
+function sync(o){const want=['confirmed','delivered'].includes(o.st)||(o.st=='returned'&&o.dmg);const m=lines(o);
+ if(want&&!o.ded){let c=0;for(const k in m){const it=S.items.find(i=>i.id==k);if(it){it.qty-=m[k]*o.qty;c+=m[k]*o.qty*it.cost}}o.cost=c;o.ded=true}
+ else if(!want&&o.ded){for(const k in m){const it=S.items.find(i=>i.id==k);if(it)it.qty+=m[k]*o.qty}o.ded=false}}
+function day(d){const del=S.ord.filter(o=>o.st=='delivered'&&o.dd==d),ret=S.ord.filter(o=>o.st=='returned'&&o.rd==d),sm=(a,f)=>a.reduce((x,y)=>x+f(y),0);
+ const rev=sm(del,o=>o.up*o.qty),cogs=sm(del,o=>o.cost||0),sh=sm(del.concat(ret),o=>o.ship||0),dm=sm(ret.filter(o=>o.dmg),o=>o.cost||0),ex=sm(S.exp.filter(e=>e.d==d),e=>e.amt),wg=sm(S.wg.filter(w=>w.d==d),w=>w.amt);
+ return{del,ret,rev,cogs,sh,dm,ex,wg,net:rev-cogs-sh-dm-ex-wg}}
+
+function addPur(){const n=val('pn'),q=num('pq'),p=num('pp'),pm=$('#ppm').value,sp=$('#psp').value;
+ if(!n||q<=0||p<=0)return alert('أدخل الاسم والكمية والسعر');if(pm=='credit'&&!sp)return alert('اختر المورد للشراء على الحساب');
+ let it=S.items.find(i=>i.name==n);if(!it){it={id:uid(),name:n,qty:0,cost:0};S.items.push(it)}
+ it.cost=it.qty>0?(it.qty*it.cost+q*p)/(it.qty+q):p;it.qty+=q;
+ S.pur.push({id:uid(),d:val('pd')||today(),item:it.id,q,p,pm,sup:pm=='credit'?sp:sp});save();render()}
+function addSup(){const n=val('sn');if(!n)return;S.sup.push({id:uid(),name:n,ph:val('sph')});save();render()}
+function paySup(){const s=$('#pys').value,a=num('pya');if(!s||a<=0)return alert('اختر المورد والمبلغ');S.pay.push({id:uid(),d:val('pyd')||today(),sup:s,amt:a});save();render()}
+function addExp(){const a=num('ea'),pm=$('#epm').value,sp=$('#esp').value;if(a<=0)return alert('أدخل المبلغ');if(pm=='credit'&&!sp)return alert('اختر المورد');
+ S.exp.push({id:uid(),d:val('ed')||today(),cat:$('#ec').value,ds:val('eds'),amt:a,pm,sup:sp});save();render()}
+function addWk(){const n=val('wn');if(!n)return;S.wk.push({id:uid(),name:n,wage:num('ww'),per:$('#wp').value});save();render()}
+function payWk(){const w=$('#wws').value,a=num('wwa');if(!w||a<=0)return alert('اختر العامل والمبلغ');S.wg.push({id:uid(),d:val('wwd')||today(),wk:w,amt:a,nt:val('wwn')});save();render()}
+function addComp(){const i=$('#bci').value,q=num('bcq');if(!i||q<=0)return alert('اختر منتجًا وكمية');tmp.comp.push({item:i,q});render()}
+function saveBox(){const n=val('bn');if(!n||!tmp.comp.length)return alert('أدخل الاسم وأضف منتجات');S.box.push({id:uid(),name:n,price:num('bp'),comp:tmp.comp});tmp.comp=[];save();render()}
+function addVr(){const i=$('#vi').value,q=num('vq');if(!i||!q)return alert('اختر منتجًا وكمية (سالبة للنقص)');tmp.vr.push({item:i,q,pr:num('vp')});render()}
+function saveOrd(){const b=S.box.find(x=>x.id==$('#ob').value),q=num('oq')||1;if(!b)return alert('أنشئ علبة أولًا');
+ const up=num('oup')>0?num('oup'):b.price+tmp.vr.reduce((a,v)=>a+v.pr,0);
+ const o={id:uid(),d:val('od')||today(),cust:val('oc'),ph:val('oph'),box:b.id,qty:q,vr:tmp.vr,up,ship:num('osh'),co:val('oco'),st:'new',ded:false,cost:0};
+ S.cfg.co=o.co;S.ord.push(o);tmp.vr=[];save();render()}
+function setSt(id,st){const o=S.ord.find(x=>x.id==id);if(st=='returned'||st=='cancelled'){o.rs=prompt('سبب الإرجاع أو الإلغاء؟')||'';o.dmg=st=='returned'&&confirm('هل البضاعة تالفة؟ (موافق = تالفة ولا تعود للمخزون)')}
+ if(st=='returned')o.rd=today();if(st=='delivered')o.dd=today();o.st=st;sync(o);save();render()}
+function rm(k,id){if(!confirm('تأكيد الحذف؟'))return;if(k=='pur'){const p=S.pur.find(x=>x.id==id),it=S.items.find(i=>i.id==p.item);if(it)it.qty-=p.q}
+ if(k=='ord'){const o=S.ord.find(x=>x.id==id);o.st='cancelled';sync(o)}S[k]=S[k].filter(x=>x.id!=id);save();render()}
+function exportD(){$('#bx').value=JSON.stringify(S)}
+function importD(){try{const d=JSON.parse($('#bx').value);if(!Array.isArray(d.ord))throw 0;S=Object.assign(S,d);save();render()}catch(e){alert('البيانات غير صالحة')}}
+
+function dlBackup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='logiciel-backup-'+today()+'.json';document.body.appendChild(a);a.click();a.remove()}
+function impFile(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.ord)||!Array.isArray(d.items))throw 0;if(!confirm('سيُستبدل كل ما في التطبيق ببيانات هذا الملف. متابعة؟'))return;S=Object.assign({items:[],sup:[],pur:[],pay:[],exp:[],wk:[],wg:[],box:[],ord:[],cfg:{co:''},ts:{}},d);save();render()}catch(e){alert('الملف ليس نسخة صالحة من لوجيسيال')}};r.readAsText(f)}
+
+const GCID='531011848782-gm6rjlj5pman60nn8bge7aodr065n46g.apps.googleusercontent.com',GFILE='logiciel-backup.json',GAUTO='logiciel-auto.json',GTOK={t:null,exp:0};
+function gStatus(m){const e=document.querySelector('#gs');if(e)e.textContent=m}
+function gToken(){return new Promise((res,rej)=>{
+ if(GTOK.t&&Date.now()<GTOK.exp)return res(GTOK.t);
+ if(!window.google||!google.accounts)return rej(new Error('تعذّر تحميل مكتبة Google، تحقق من الإنترنت'));
+ const c=google.accounts.oauth2.initTokenClient({client_id:GCID,scope:'https://www.googleapis.com/auth/drive.file',
+  callback:r=>{if(r.error)return rej(new Error(r.error));GTOK.t=r.access_token;GTOK.exp=Date.now()+(Number(r.expires_in||3600)-60)*1000;res(r.access_token)},
+  error_callback:e=>rej(new Error((e&&e.type)||'popup'))});
+ c.requestAccessToken()})}
+async function gApi(url,o){o=o||{};const t=await gToken();const r=await fetch(url,Object.assign({},o,{headers:Object.assign({Authorization:'Bearer '+t},o.headers||{})}));if(!r.ok)throw new Error('Drive '+r.status);return r}
+async function gFind(nm){const r=await gApi('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name='"+(nm||GFILE)+"' and trashed=false")+'&fields='+encodeURIComponent('files(id,modifiedTime)')+'&orderBy='+encodeURIComponent('modifiedTime desc'));const j=await r.json();return(j.files&&j.files[0])||null}
+async function driveSave(auto){const nm=auto?GAUTO:GFILE;if(!auto)gStatus('جارٍ الحفظ…');try{const f=await gFind(nm),body=JSON.stringify(S);
+ if(f){await gApi('https://www.googleapis.com/upload/drive/v3/files/'+f.id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body})}
+ else{const bd='lgb'+Date.now(),mp='--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:nm,mimeType:'application/json'})+'\r\n--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+body+'\r\n--'+bd+'--';
+  await gApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:mp})}
+ const w=new Date().toLocaleString('ar');if(auto){lastAuto=body;gStatus('✔ حفظ تلقائي: '+w)}else{try{localStorage.setItem('logiciel_drive_last',w)}catch(e){}gStatus('✔ تم الحفظ في Drive: '+w)}}catch(e){if(auto){gBanner('تعذّر الحفظ التلقائي ('+e.message+'). اضغط لإعادة المحاولة')}else gStatus('فشل الحفظ: '+e.message)}}
+async function driveRestore(){gStatus('جارٍ البحث عن النسخة…');try{const fa=await gFind(GFILE),fb=await gFind(GAUTO),f=[fa,fb].filter(Boolean).sort((x,y)=>new Date(y.modifiedTime)-new Date(x.modifiedTime))[0];if(!f){gStatus('لا توجد نسخة في Drive بعد');return}
+ const r=await gApi('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media'),d=await r.json();
+ if(!Array.isArray(d.ord)||!Array.isArray(d.items))throw new Error('الملف ليس نسخة صالحة');
+ if(!confirm('سيُستبدل كل ما في التطبيق بنسخة Drive المحفوظة بتاريخ '+new Date(f.modifiedTime).toLocaleString('ar')+(f===fb?' (حفظ تلقائي)':' (حفظ يدوي)')+'. متابعة؟')){gStatus('أُلغيت الاستعادة');return}
+ S=Object.assign({items:[],sup:[],pur:[],pay:[],exp:[],wk:[],wg:[],box:[],ord:[],cfg:{co:''},ts:{}},d);save();render();gStatus('✔ تمت الاستعادة من Drive')}catch(e){gStatus('فشلت الاستعادة: '+e.message)}}
+
+let at=null,lastAuto='';
+const gAutoOn=()=>{try{return localStorage.getItem('logiciel_auto')==='1'}catch(e){return false}};
+function gBanner(m){const b=document.querySelector('#gb');if(!b)return;b.innerHTML=m?'<div class="card" style="border-color:var(--r)"><span>'+m+'</span> <button class="p" onclick="gRenew()">تجديد الحفظ التلقائي</button></div>':''}
+function gRenew(){gToken().then(()=>{gBanner('');autoRun()}).catch(e=>gBanner('لم يكتمل تسجيل الدخول ('+e.message+')'))}
+function autoSched(){if(!gAutoOn())return;clearTimeout(at);at=setTimeout(autoRun,45000)}
+async function autoRun(){if(!gAutoOn())return;
+ if(!(GTOK.t&&Date.now()<GTOK.exp)){gBanner('الحفظ التلقائي متوقف حتى تجدّد الدخول إلى Google.');return}
+ if(!S.ord.length&&!S.items.length&&!S.pur.length)return;
+ if(JSON.stringify(S)===lastAuto)return;
+ await driveSave(true)}
+function gAutoToggle(cb){if(cb.checked){gToken().then(()=>{try{localStorage.setItem('logiciel_auto','1')}catch(e){}gStatus('✔ الحفظ التلقائي مفعّل');autoRun()}).catch(e=>{cb.checked=false;gStatus('فشل التفعيل: '+e.message)})}else{try{localStorage.removeItem('logiciel_auto')}catch(e){}clearTimeout(at);gBanner('');gStatus('أُوقف الحفظ التلقائي')}}
+const V={
+dash(){const r=day(dsel),m=dsel.slice(0,7);let mn=0;for(let i=1;i<=31;i++)mn+=day(m+'-'+String(i).padStart(2,'0')).net;
+ const od=S.ord.filter(o=>o.d==dsel),by={},cs={};od.forEach(o=>{const b=nm(S.box,o.box);by[b]=(by[b]||0)+o.qty;cs[o.st]=(cs[o.st]||0)+1});
+ const rs=S.ord.filter(o=>o.rs).slice(-10).reverse(),cl=n=>n<0?'neg':'pos';
+ return `<div class="card">${fld('dd','التاريخ','date',`value="${dsel}" onchange="dsel=this.value;render()"`)}</div>
+ <div class="g"><div class="k"><small>المبيعات المسلّمة</small><b>${fm(r.rev)}</b></div><div class="k"><small>تكلفة البضاعة</small><b>${fm(r.cogs)}</b></div><div class="k"><small>تكلفة الشحن</small><b>${fm(r.sh)}</b></div><div class="k"><small>خسائر التلف</small><b>${fm(r.dm)}</b></div><div class="k"><small>المصاريف</small><b>${fm(r.ex)}</b></div><div class="k"><small>الأجور</small><b>${fm(r.wg)}</b></div><div class="k"><small>صافي ربح اليوم</small><b class="${cl(r.net)}">${fm(r.net)}</b></div><div class="k"><small>صافي الشهر</small><b class="${cl(mn)}">${fm(mn)}</b></div></div>
+ <h2>طلبيات أُدخلت في هذا اليوم: ${od.length}</h2>
+ ${tbl(['الحالة','العدد'],Object.keys(cs).map(k=>[ST[k],cs[k]]))}
+ ${tbl(['نوع العلبة','عدد القطع'],Object.keys(by).map(k=>[esc(k),by[k]]))}
+ <h2>آخر أسباب الإرجاع والإلغاء</h2>${tbl(['الطلب','الحالة','السبب'],rs.map(o=>[esc(o.cust||'—'),ST[o.st],esc(o.rs)]))}
+ <small class="n">الربح = مبيعات مسلّمة − تكلفة بضاعتها − الشحن (للمسلّم والمرجوع) − تالف − مصاريف − أجور. المشتريات تدخل المخزون ولا تُحسب مصروفًا.</small>`},
+ord(){return `<div class="card"><h2>طلبية جديدة</h2><div class="f">${fld('od','التاريخ','date',`value="${today()}"`)}${fld('oc','الزبون')}${fld('oph','الهاتف','tel')}${sel('ob','العلبة',opt(S.box))}${fld('oq','عدد العلب','number','value="1" min="1"')}${fld('oup','سعر العلبة (فارغ = تلقائي)','number')}${fld('osh','تكلفة الشحن عليّ','number')}${fld('oco','شركة الشحن','text',`value="${esc(S.cfg.co)}"`)}</div>
+ <h2>حالة خاصة (زيادة/نقصان في العلبة)</h2><div class="f">${sel('vi','المنتج',opt(S.items))}${fld('vq','الكمية (+زيادة / −نقص)','number')}${fld('vp','فرق السعر','number')}<button onclick="addVr()">إضافة</button></div>
+ ${tmp.vr.map((v,i)=>`<div>• ${esc(nm(S.items,v.item))} ${v.q>0?'+':''}${v.q} | سعر ${v.pr>0?'+':''}${v.pr} <button class="d" onclick="tmp.vr.splice(${i},1);render()">×</button></div>`).join('')}
+ <p><button class="p" onclick="saveOrd()">حفظ الطلبية</button></p></div>
+ ${S.ord.slice().reverse().map(o=>`<div class="card"><b>${esc(o.cust||'بدون اسم')}</b> ${esc(o.ph||'')} — ${esc(nm(S.box,o.box))} × ${o.qty}<br><small class="n">${o.d} | ${fm(o.up)} للعلبة | شحن ${fm(o.ship||0)} ${o.co?'| '+esc(o.co):''}${o.vr.length?' | حالات خاصة: '+o.vr.map(v=>esc(nm(S.items,v.item))+' '+v.q).join('، '):''}${o.rs?' | السبب: '+esc(o.rs):''}</small><br>
+ <select onchange="setSt('${o.id}',this.value)">${Object.keys(ST).map(k=>`<option value="${k}" ${k==o.st?'selected':''}>${ST[k]}</option>`).join('')}</select> ${dl('ord',o.id)}</div>`).join('')}`},
+box(){return `<div class="card"><h2>علبة جديدة</h2><div class="f">${fld('bn','اسم العلبة')}${fld('bp','سعر البيع','number')}</div><div class="f">${sel('bci','منتج',opt(S.items))}${fld('bcq','الكمية','number','value="1"')}<button onclick="addComp()">إضافة منتج</button></div>
+ ${tmp.comp.map((c,i)=>`<div>• ${esc(nm(S.items,c.item))} × ${c.q} <button class="d" onclick="tmp.comp.splice(${i},1);render()">×</button></div>`).join('')}<p><button class="p" onclick="saveBox()">حفظ العلبة</button></p></div>
+ ${tbl(['العلبة','السعر','التكلفة','هامش','المحتوى',''],S.box.map(b=>[esc(b.name),fm(b.price),fm(boxCost(b)),fm(b.price-boxCost(b)),b.comp.map(c=>esc(nm(S.items,c.item))+'×'+c.q).join('، '),dl('box',b.id)]))}`},
+stk(){return `<div class="card"><h2>تسجيل شراء</h2><div class="f">${fld('pd','التاريخ','date',`value="${today()}"`)}${fld('pn','المنتج','text','list="il"')}<datalist id="il">${S.items.map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist>${fld('pq','الكمية','number')}${fld('pp','سعر الوحدة','number')}${sel('ppm','الدفع','<option value="cash">نقدًا</option><option value="credit">على الحساب</option>')}${sel('psp','المورد','<option value="">—</option>'+opt(S.sup))}</div><p><button class="p" onclick="addPur()">حفظ</button></p></div>
+ <h2>المخزون (متوسط التكلفة المرجّح)</h2>${tbl(['المنتج','الكمية','التكلفة','القيمة'],S.items.map(i=>[esc(i.name),Math.round(i.qty*100)/100,fm(i.cost),fm(i.qty*i.cost)]))}
+ <h2>سجل المشتريات</h2>${tbl(['التاريخ','المنتج','كمية','سعر','الدفع','المورد',''],S.pur.slice().reverse().map(p=>[p.d,esc(nm(S.items,p.item)),p.q,fm(p.p),p.pm=='cash'?'نقدًا':'حساب',esc(p.sup?nm(S.sup,p.sup):'—'),dl('pur',p.id)]))}`},
+sup(){return `<div class="card"><h2>مورد جديد</h2><div class="f">${fld('sn','الاسم')}${fld('sph','الهاتف','tel')}<button class="p" onclick="addSup()">إضافة</button></div></div>
+ <div class="card"><h2>دفعة لمورد</h2><div class="f">${sel('pys','المورد',opt(S.sup))}${fld('pya','المبلغ','number')}${fld('pyd','التاريخ','date',`value="${today()}"`)}<button class="p" onclick="paySup()">تسجيل</button></div></div>
+ ${tbl(['المورد','الهاتف','المتبقي عليّ',''],S.sup.map(s=>[esc(s.name),esc(s.ph||''),`<b class="${supBal(s.id)>0?'neg':''}">${fm(supBal(s.id))}</b>`,dl('sup',s.id)]))}`},
+exp(){return `<div class="card"><h2>مصروف</h2><div class="f">${fld('ed','التاريخ','date',`value="${today()}"`)}${sel('ec','البند (حساب SCF)',SCF.map(c=>`<option>${c[1]} — ${c[0]}</option>`).join(''))}${fld('eds','وصف')}${fld('ea','المبلغ','number')}${sel('epm','الدفع','<option value="cash">نقدًا</option><option value="credit">على الحساب</option>')}${sel('esp','المورد','<option value="">—</option>'+opt(S.sup))}</div><p><button class="p" onclick="addExp()">حفظ</button></p></div>
+ ${tbl(['التاريخ','البند','وصف','المبلغ','الدفع',''],S.exp.slice().reverse().map(e=>[e.d,esc(e.cat),esc(e.ds),fm(e.amt),e.pm=='cash'?'نقدًا':'حساب',dl('exp',e.id)]))}
+ <div class="card"><h2>عامل جديد</h2><div class="f">${fld('wn','الاسم')}${fld('ww','الأجر','number')}${sel('wp','الفترة','<option>يوميًا</option><option>أسبوعيًا</option><option>شهريًا</option>')}<button class="p" onclick="addWk()">إضافة</button></div></div>
+ <div class="card"><h2>دفع أجر (حساب 631 حسب SCF)</h2><div class="f">${sel('wws','العامل',opt(S.wk))}${fld('wwa','المبلغ','number')}${fld('wwd','التاريخ','date',`value="${today()}"`)}${fld('wwn','ملاحظة')}<button class="p" onclick="payWk()">تسجيل</button></div></div>
+ ${tbl(['العامل','الأجر','الفترة','مجموع المدفوع',''],S.wk.map(w=>[esc(w.name),fm(w.wage),w.per,fm(S.wg.filter(x=>x.wk==w.id).reduce((a,x)=>a+x.amt,0)),dl('wk',w.id)]))}
+ ${tbl(['التاريخ','العامل','المبلغ','ملاحظة',''],S.wg.slice().reverse().map(w=>[w.d,esc(nm(S.wk,w.wk)),fm(w.amt),esc(w.nt||''),dl('wg',w.id)]))}`},
+jrn(){const E=jr(),T={};E.forEach(e=>{(T[e.dr]=T[e.dr]||{d:0,c:0}).d+=e.a;(T[e.cr]=T[e.cr]||{d:0,c:0}).c+=e.a});
+ return `<div class="card"><small class="n">قيود مولَّدة تلقائيًا من بياناتك بطريقة الجرد المستمر. الافتراضات: البيع يُقبض في الصندوق (53) عند التسليم، والدفع النقدي كله من الصندوق، دون ضرائب ورسوم. رموز SCF هنا من معرفتي ولم أتحقق منها: راجعها على المدونة الرسمية ومع محاسب قبل أي استخدام قانوني أو ضريبي.</small></div>
+ <h2>ميزان المراجعة</h2>${tbl(['الحساب','مدين','دائن','الرصيد'],Object.keys(T).sort().map(k=>[k+' '+(AC[k]||''),fm(T[k].d),fm(T[k].c),fm(T[k].d-T[k].c)]))}
+ <h2>دفتر اليومية (آخر 150 قيدًا)</h2>${tbl(['التاريخ','البيان','مدين','دائن','المبلغ'],E.slice(-150).reverse().map(e=>[e.d,esc(e.l),e.dr+' '+(AC[e.dr]||''),e.cr+' '+(AC[e.cr]||''),fm(e.a)]))}`},
+bk(){return `<div class="card"><p>تُحفظ بياناتك داخل هذا الجهاز (المتصفح). احتفظ بنسخة احتياطية دورية، فمسح بيانات المتصفح يحذفها.</p><p><b>نسخة احتياطية في Google Drive</b><br><button class="p" onclick="driveSave()">حفظ في Drive</button> <button onclick="driveRestore()">استعادة من Drive</button><br><label style="display:inline"><input type="checkbox" style="width:auto" ${gAutoOn()?'checked':''} onchange="gAutoToggle(this)"> حفظ تلقائي بعد كل تعديل (أثناء فتح التطبيق)</label><br><small class="n" id="gs">${(()=>{try{return localStorage.getItem('logiciel_drive_last')?'آخر حفظ: '+localStorage.getItem('logiciel_drive_last'):'لم تُحفظ نسخة بعد'}catch(e){return ''}})()}</small></p><p><button class="p" onclick="dlBackup()">تحميل نسخة (ملف)</button> <label style="display:inline">استيراد ملف: <input type="file" accept=".json" onchange="impFile(this)" style="width:auto"></label></p><p>نسخة احتياطية يدوية: انسخ النص أدناه واحتفظ به، ولصقه هنا للاستعادة.</p><textarea id="bx" rows="8"></textarea><p><button onclick="exportD()">تصدير</button> <button class="p" onclick="importD()">استيراد</button></p></div>`}
+};
+function render(){$('#nav').innerHTML=TABS.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('');$('#app').innerHTML=V[tab]()}
+render();if(gAutoOn())setTimeout(()=>gBanner('الحفظ التلقائي مفعّل لكنه يحتاج تسجيل دخول لهذه الجلسة.'),600);try{if('serviceWorker' in navigator&&location.protocol.indexOf('http')==0)navigator.serviceWorker.register('sw.js')}catch(e){}
+</script></body></html>
