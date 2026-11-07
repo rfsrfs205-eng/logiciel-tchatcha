@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>لوجيسيال</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#0f6e56"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>لوجيسيال</title><link rel="manifest" href="manifest.json"><script src="https://accounts.google.com/gsi/client" async defer></script><link rel="icon" href="icon.svg"><meta name="theme-color" content="#0f6e56"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <style>
 :root{--bg:#f6f5f1;--c:#fff;--t:#1d1d1b;--m:#6b6a64;--b:#e2e0d8;--a:#0f6e56;--r:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--c:#201f1e;--t:#ecebe6;--m:#a3a199;--b:#34332f;--a:#3fbf9a;--r:#f2877f;color-scheme:dark}}
@@ -16,7 +16,7 @@ label{display:block;font-size:13px;color:var(--m)}input,select,textarea{width:10
 .w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--b);padding:5px 6px;text-align:right;white-space:nowrap}th{color:var(--m);font-weight:600}
 .neg{color:var(--r)}.pos{color:var(--a)}small.n{color:var(--m)}
 </style></head><body>
-<h1>لوجيسيال — إدارة المتجر</h1><nav id="nav"></nav><div id="app"></div>
+<h1>لوجيسيال — إدارة المتجر</h1><div id="gb"></div><nav id="nav"></nav><div id="app"></div>
 <script>
 const K='logiciel_v1';
 let S={items:[],sup:[],pur:[],pay:[],exp:[],wk:[],wg:[],box:[],ord:[],cfg:{co:''},ts:{}};
@@ -25,7 +25,7 @@ let CL=null,cuid=null,pt=null,lastSync={},dirty=new Set();
 const shardsOf=()=>{const o={cfg:{v:S.cfg}};['items','sup','pur','pay','exp','wk','wg','box'].forEach(k=>o[k]={v:S[k]});S.ord.forEach(x=>{const k='ord_'+(x.d||'0000-00').slice(0,7);(o[k]=o[k]||{v:[]}).v.push(x)});return o};
 Object.entries(shardsOf()).forEach(([k,v])=>lastSync[k]=JSON.stringify(v));
 const loc=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
-function save(){const c=shardsOf();for(const k in c){const j=JSON.stringify(c[k]);if(lastSync[k]!==j){lastSync[k]=j;S.ts[k]=Date.now();dirty.add(k)}}loc();clearTimeout(pt);pt=setTimeout(push,1500)}
+function save(){const c=shardsOf();for(const k in c){const j=JSON.stringify(c[k]);if(lastSync[k]!==j){lastSync[k]=j;S.ts[k]=Date.now();dirty.add(k)}}loc();clearTimeout(pt);pt=setTimeout(push,1500);autoSched()}
 const put=async k=>{const sh=shardsOf()[k];await CL.collection('data/users/'+cuid).doc(k).set({v:sh?sh.v:[],ts:S.ts[k]})};
 function setCloud(s){const e=document.querySelector('#cs');if(e)e.textContent=s||(CL?'☁ متصل بالسحابة':'محلي فقط')}
 async function push(){if(!CL||!dirty.size)return;setCloud('جارٍ المزامنة…');try{for(const k of [...dirty]){await put(k);dirty.delete(k)}setCloud()}catch(e){setCloud('تعذّرت المزامنة، البيانات محفوظة محليًا')}}
@@ -98,6 +98,40 @@ function importD(){try{const d=JSON.parse($('#bx').value);if(!Array.isArray(d.or
 
 function dlBackup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='logiciel-backup-'+today()+'.json';document.body.appendChild(a);a.click();a.remove()}
 function impFile(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.ord)||!Array.isArray(d.items))throw 0;if(!confirm('سيُستبدل كل ما في التطبيق ببيانات هذا الملف. متابعة؟'))return;S=Object.assign({items:[],sup:[],pur:[],pay:[],exp:[],wk:[],wg:[],box:[],ord:[],cfg:{co:''},ts:{}},d);save();render()}catch(e){alert('الملف ليس نسخة صالحة من لوجيسيال')}};r.readAsText(f)}
+
+const GCID='531011848782-gm6rjlj5pman60nn8bge7aodr065n46g.apps.googleusercontent.com',GFILE='logiciel-backup.json',GAUTO='logiciel-auto.json',GTOK={t:null,exp:0};
+function gStatus(m){const e=document.querySelector('#gs');if(e)e.textContent=m}
+function gToken(){return new Promise((res,rej)=>{
+ if(GTOK.t&&Date.now()<GTOK.exp)return res(GTOK.t);
+ if(!window.google||!google.accounts)return rej(new Error('تعذّر تحميل مكتبة Google، تحقق من الإنترنت'));
+ const c=google.accounts.oauth2.initTokenClient({client_id:GCID,scope:'https://www.googleapis.com/auth/drive.file',
+  callback:r=>{if(r.error)return rej(new Error(r.error));GTOK.t=r.access_token;GTOK.exp=Date.now()+(Number(r.expires_in||3600)-60)*1000;res(r.access_token)},
+  error_callback:e=>rej(new Error((e&&e.type)||'popup'))});
+ c.requestAccessToken()})}
+async function gApi(url,o){o=o||{};const t=await gToken();const r=await fetch(url,Object.assign({},o,{headers:Object.assign({Authorization:'Bearer '+t},o.headers||{})}));if(!r.ok)throw new Error('Drive '+r.status);return r}
+async function gFind(nm){const r=await gApi('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name='"+(nm||GFILE)+"' and trashed=false")+'&fields='+encodeURIComponent('files(id,modifiedTime)')+'&orderBy='+encodeURIComponent('modifiedTime desc'));const j=await r.json();return(j.files&&j.files[0])||null}
+async function driveSave(auto){const nm=auto?GAUTO:GFILE;if(!auto)gStatus('جارٍ الحفظ…');try{const f=await gFind(nm),body=JSON.stringify(S);
+ if(f){await gApi('https://www.googleapis.com/upload/drive/v3/files/'+f.id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body})}
+ else{const bd='lgb'+Date.now(),mp='--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:nm,mimeType:'application/json'})+'\r\n--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+body+'\r\n--'+bd+'--';
+  await gApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:mp})}
+ const w=new Date().toLocaleString('ar');if(auto){lastAuto=body;gStatus('✔ حفظ تلقائي: '+w)}else{try{localStorage.setItem('logiciel_drive_last',w)}catch(e){}gStatus('✔ تم الحفظ في Drive: '+w)}}catch(e){if(auto){gBanner('تعذّر الحفظ التلقائي ('+e.message+'). اضغط لإعادة المحاولة')}else gStatus('فشل الحفظ: '+e.message)}}
+async function driveRestore(){gStatus('جارٍ البحث عن النسخة…');try{const fa=await gFind(GFILE),fb=await gFind(GAUTO),f=[fa,fb].filter(Boolean).sort((x,y)=>new Date(y.modifiedTime)-new Date(x.modifiedTime))[0];if(!f){gStatus('لا توجد نسخة في Drive بعد');return}
+ const r=await gApi('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media'),d=await r.json();
+ if(!Array.isArray(d.ord)||!Array.isArray(d.items))throw new Error('الملف ليس نسخة صالحة');
+ if(!confirm('سيُستبدل كل ما في التطبيق بنسخة Drive المحفوظة بتاريخ '+new Date(f.modifiedTime).toLocaleString('ar')+(f===fb?' (حفظ تلقائي)':' (حفظ يدوي)')+'. متابعة؟')){gStatus('أُلغيت الاستعادة');return}
+ S=Object.assign({items:[],sup:[],pur:[],pay:[],exp:[],wk:[],wg:[],box:[],ord:[],cfg:{co:''},ts:{}},d);save();render();gStatus('✔ تمت الاستعادة من Drive')}catch(e){gStatus('فشلت الاستعادة: '+e.message)}}
+
+let at=null,lastAuto='';
+const gAutoOn=()=>{try{return localStorage.getItem('logiciel_auto')==='1'}catch(e){return false}};
+function gBanner(m){const b=document.querySelector('#gb');if(!b)return;b.innerHTML=m?'<div class="card" style="border-color:var(--r)"><span>'+m+'</span> <button class="p" onclick="gRenew()">تجديد الحفظ التلقائي</button></div>':''}
+function gRenew(){gToken().then(()=>{gBanner('');autoRun()}).catch(e=>gBanner('لم يكتمل تسجيل الدخول ('+e.message+')'))}
+function autoSched(){if(!gAutoOn())return;clearTimeout(at);at=setTimeout(autoRun,45000)}
+async function autoRun(){if(!gAutoOn())return;
+ if(!(GTOK.t&&Date.now()<GTOK.exp)){gBanner('الحفظ التلقائي متوقف حتى تجدّد الدخول إلى Google.');return}
+ if(!S.ord.length&&!S.items.length&&!S.pur.length)return;
+ if(JSON.stringify(S)===lastAuto)return;
+ await driveSave(true)}
+function gAutoToggle(cb){if(cb.checked){gToken().then(()=>{try{localStorage.setItem('logiciel_auto','1')}catch(e){}gStatus('✔ الحفظ التلقائي مفعّل');autoRun()}).catch(e=>{cb.checked=false;gStatus('فشل التفعيل: '+e.message)})}else{try{localStorage.removeItem('logiciel_auto')}catch(e){}clearTimeout(at);gBanner('');gStatus('أُوقف الحفظ التلقائي')}}
 const V={
 dash(){const r=day(dsel),m=dsel.slice(0,7);let mn=0;for(let i=1;i<=31;i++)mn+=day(m+'-'+String(i).padStart(2,'0')).net;
  const od=S.ord.filter(o=>o.d==dsel),by={},cs={};od.forEach(o=>{const b=nm(S.box,o.box);by[b]=(by[b]||0)+o.qty;cs[o.st]=(cs[o.st]||0)+1});
@@ -134,8 +168,8 @@ jrn(){const E=jr(),T={};E.forEach(e=>{(T[e.dr]=T[e.dr]||{d:0,c:0}).d+=e.a;(T[e.c
  return `<div class="card"><small class="n">قيود مولَّدة تلقائيًا من بياناتك بطريقة الجرد المستمر. الافتراضات: البيع يُقبض في الصندوق (53) عند التسليم، والدفع النقدي كله من الصندوق، دون ضرائب ورسوم. رموز SCF هنا من معرفتي ولم أتحقق منها: راجعها على المدونة الرسمية ومع محاسب قبل أي استخدام قانوني أو ضريبي.</small></div>
  <h2>ميزان المراجعة</h2>${tbl(['الحساب','مدين','دائن','الرصيد'],Object.keys(T).sort().map(k=>[k+' '+(AC[k]||''),fm(T[k].d),fm(T[k].c),fm(T[k].d-T[k].c)]))}
  <h2>دفتر اليومية (آخر 150 قيدًا)</h2>${tbl(['التاريخ','البيان','مدين','دائن','المبلغ'],E.slice(-150).reverse().map(e=>[e.d,esc(e.l),e.dr+' '+(AC[e.dr]||''),e.cr+' '+(AC[e.cr]||''),fm(e.a)]))}`},
-bk(){return `<div class="card"><p>تُحفظ بياناتك داخل هذا الجهاز (المتصفح). احتفظ بنسخة احتياطية دورية، فمسح بيانات المتصفح يحذفها.</p><p><button class="p" onclick="dlBackup()">تحميل نسخة (ملف)</button> <label style="display:inline">استيراد ملف: <input type="file" accept=".json" onchange="impFile(this)" style="width:auto"></label></p><p>نسخة احتياطية يدوية: انسخ النص أدناه واحتفظ به، ولصقه هنا للاستعادة.</p><textarea id="bx" rows="8"></textarea><p><button onclick="exportD()">تصدير</button> <button class="p" onclick="importD()">استيراد</button></p></div>`}
+bk(){return `<div class="card"><p>تُحفظ بياناتك داخل هذا الجهاز (المتصفح). احتفظ بنسخة احتياطية دورية، فمسح بيانات المتصفح يحذفها.</p><p><b>نسخة احتياطية في Google Drive</b><br><button class="p" onclick="driveSave()">حفظ في Drive</button> <button onclick="driveRestore()">استعادة من Drive</button><br><label style="display:inline"><input type="checkbox" style="width:auto" ${gAutoOn()?'checked':''} onchange="gAutoToggle(this)"> حفظ تلقائي بعد كل تعديل (أثناء فتح التطبيق)</label><br><small class="n" id="gs">${(()=>{try{return localStorage.getItem('logiciel_drive_last')?'آخر حفظ: '+localStorage.getItem('logiciel_drive_last'):'لم تُحفظ نسخة بعد'}catch(e){return ''}})()}</small></p><p><button class="p" onclick="dlBackup()">تحميل نسخة (ملف)</button> <label style="display:inline">استيراد ملف: <input type="file" accept=".json" onchange="impFile(this)" style="width:auto"></label></p><p>نسخة احتياطية يدوية: انسخ النص أدناه واحتفظ به، ولصقه هنا للاستعادة.</p><textarea id="bx" rows="8"></textarea><p><button onclick="exportD()">تصدير</button> <button class="p" onclick="importD()">استيراد</button></p></div>`}
 };
 function render(){$('#nav').innerHTML=TABS.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('');$('#app').innerHTML=V[tab]()}
-render();try{if('serviceWorker' in navigator&&location.protocol.indexOf('http')==0)navigator.serviceWorker.register('sw.js')}catch(e){}
+render();if(gAutoOn())setTimeout(()=>gBanner('الحفظ التلقائي مفعّل لكنه يحتاج تسجيل دخول لهذه الجلسة.'),600);try{if('serviceWorker' in navigator&&location.protocol.indexOf('http')==0)navigator.serviceWorker.register('sw.js')}catch(e){}
 </script></body></html>
