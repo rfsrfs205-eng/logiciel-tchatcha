@@ -61,6 +61,8 @@ function jr(){const E=[],A=(d,l,dr,cr,a)=>{if(a)E.push({d:d||'',l,dr,cr,a})};
  return E.sort((a,b)=>String(a.d).localeCompare(String(b.d)))}
 let tab='dash',dsel=today(),tmp={comp:[],vr:[]};
 const DR={};
+const ZRC={out:[],save:false,busy:false};
+const ZR={rows:[],err:'',states:[],map:{},opts:{ship:false,date:''}};
 function clr(k){k.split(' ').forEach(x=>delete DR[x])}
 function restoreDrafts(){for(const k in DR){const e=document.getElementById(k);if(e&&e.value!==DR[k])e.value=DR[k]}}
 ['input','change'].forEach(ev=>document.addEventListener(ev,e=>{const t=e.target;if(t&&t.id&&t.id!=='bx'&&t.type!=='file'&&t.closest&&t.closest('#app'))DR[t.id]=t.value},true));
@@ -137,6 +139,87 @@ async function autoRun(){if(!gAutoOn())return;
  if(JSON.stringify(S)===lastAuto)return;
  await driveSave(true)}
 function gAutoToggle(cb){if(cb.checked){gToken().then(()=>{try{localStorage.setItem('logiciel_auto','1')}catch(e){}gStatus('✔ الحفظ التلقائي مفعّل');autoRun()}).catch(e=>{cb.checked=false;gStatus('فشل التفعيل: '+e.message)})}else{try{localStorage.removeItem('logiciel_auto')}catch(e){}clearTimeout(at);gBanner('');gStatus('أُوقف الحفظ التلقائي')}}
+
+function csvParse(t){t=t.replace(/^\uFEFF/,'');const first=t.split(/\r?\n/)[0]||'';const dl=[',',';','\t'].map(d=>[d,first.split(d).length]).sort((a,b)=>b[1]-a[1])[0][0];
+ const rows=[];let row=[],f='',q=false;
+ for(let i=0;i<t.length;i++){const c=t[i];
+  if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}
+  else if(c=='"')q=true;
+  else if(c==dl){row.push(f);f=''}
+  else if(c=='\n'||c=='\r'){if(c=='\r'&&t[i+1]=='\n')i++;row.push(f);rows.push(row);row=[];f=''}
+  else f+=c}
+ if(f!==''||row.length){row.push(f);rows.push(row)}
+ return rows.filter(r=>r.some(x=>x!==''))}
+function normPh(x){const d=String(x==null?'':x).replace(/\D/g,'');return d.length>=9?d.slice(-9):''}
+function zrLoad(inp){const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>zrIngest(String(r.result));r.readAsText(f,'utf-8')}
+function zrIngest(text){ZR.err='';ZR.rows=[];ZR.states=[];
+ const R=csvParse(text);if(R.length<2){ZR.err='الملف فارغ أو غير مقروء. استعمل ملف CSV الأصلي كما نزّلته من ZR دون حفظه من Excel.';render();return}
+ const H=R[0].map(h=>h.trim()),ix=n=>H.indexOf(n),need=['State.Name','DeliveryPrice','Customer.Phone.Number1'],miss=need.filter(n=>ix(n)<0);
+ if(miss.length){ZR.err='أعمدة ناقصة في الملف: '+miss.join('، ');render();return}
+ try{ZR.map=JSON.parse(localStorage.getItem('logiciel_zrmap')||'{}')}catch(e){ZR.map={}}
+ const g=(r,n)=>ix(n)>=0?(r[ix(n)]||'').trim():'';
+ ZR.rows=R.slice(1).map(r=>({tn:g(r,'TrackingNumber'),ph:[normPh(g(r,'Customer.Phone.Number1')),normPh(g(r,'Customer.Phone.Number2'))].filter(Boolean),st:g(r,'State.Name'),dp:parseFloat(g(r,'DeliveryPrice')),sel:''}));
+ ZR.states=[...new Set(ZR.rows.map(r=>r.st))].sort();
+ ZR.rows.forEach(r=>{let c=r.tn?S.ord.filter(o=>o.tn&&o.tn==r.tn):[];if(!c.length)c=S.ord.filter(o=>r.ph.includes(normPh(o.ph)));const live=c.filter(o=>o.st!='cancelled');if(live.length==1)r.sel=live[0].id;r.cand=c.map(o=>o.id)});
+ render()}
+function zrMap(i,v){ZR.map[ZR.states[i]]=v;try{localStorage.setItem('logiciel_zrmap',JSON.stringify(ZR.map))}catch(e){}render()}
+function zrSel(i,v){ZR.rows[i].sel=v;render()}
+function zrClear(){ZR.rows=[];ZR.err='';ZR.states=[];render()}
+function zrApply(){const date=ZR.opts.date||today(),used={};let n=0,dup=0;const todo=[];
+ ZR.rows.forEach(r=>{const m=ZR.map[r.st];if(!r.sel||!m)return;if(used[r.sel]){dup++;return}used[r.sel]=1;todo.push([r,m])});
+ if(!todo.length)return alert('لا توجد صفوف جاهزة: اختر الحالة المقابلة لكل حالة في ZR، وتأكد من اختيار الطلبية.');
+ if(!confirm('سيتم تحديث '+todo.length+' طلبية بتاريخ '+date+(ZR.opts.ship?' مع تحديث تكلفة الشحن':'')+'. متابعة؟'))return;
+ todo.forEach(([r,m])=>{const o=S.ord.find(x=>x.id==r.sel);if(!o)return;
+  if(m=='delivered'){o.dd=date;o.st='delivered'}else{o.rd=date;o.rs='استيراد من ZR';o.dmg=(m=='returned_dmg');o.st='returned'}
+  if(ZR.opts.ship&&isFinite(r.dp)&&r.dp>=0)o.ship=r.dp;
+  if(r.tn)o.tn=r.tn;sync(o);n++});
+ save();ZR.rows=[];ZR.states=[];alert('تم تحديث '+n+' طلبية'+(dup?'. تجاهلت '+dup+' صفًّا مكرّرًا لنفس الطلبية.':'.'));render()}
+function zrUi(){const M=[['','تجاهل'],['delivered','مسلّمة'],['returned','مرجوعة (سليمة)'],['returned_dmg','مرجوعة (تالفة)']];
+ let h='<details class="card"'+(ZR.rows.length||ZR.err?' open':'')+'><summary><b>استيراد من ZR (ملف CSV)</b></summary>'
+ +'<p><small class="n">نزّل ملف الطرود من حسابك في ZR وارفعه هنا كما هو، دون فتحه وحفظه من Excel. لا يتصل التطبيق بـ ZR، ويقرأ الملف من جهازك فقط.</small></p>'
+ +'<input type="file" accept=".csv,text/csv,text/plain" onchange="zrLoad(this)">';
+ if(ZR.err)h+='<p class="neg">'+esc(ZR.err)+'</p>';
+ if(ZR.rows.length){
+  h+='<h2>1) ماذا تعني كل حالة في ZR؟</h2>'+ZR.states.map((st,i)=>'<div>'+esc(st||'(فارغة)')+' ← <select onchange="zrMap('+i+',this.value)">'+M.map(m=>'<option value="'+m[0]+'" '+((ZR.map[st]||'')==m[0]?'selected':'')+'>'+m[1]+'</option>').join('')+'</select></div>').join('')
+  +'<h2>2) خيارات</h2><div><label style="display:inline">تاريخ التسليم/الإرجاع المطبَّق (الملف لا يحتوي تاريخ تسليم)</label> <input type="date" style="width:auto" value="'+(ZR.opts.date||today())+'" onchange="ZR.opts.date=this.value"></div>'
+  +'<div><label style="display:inline"><input type="checkbox" style="width:auto" '+(ZR.opts.ship?'checked':'')+' onchange="ZR.opts.ship=this.checked;render()"> تحديث «تكلفة الشحن عليّ» من عمود DeliveryPrice (فعّله فقط إن كان هذا ما تدفعه أنت)</label></div>'
+  +'<h2>3) معاينة ('+ZR.rows.length+' صفًّا)</h2><div class="w"><table><tr><th>الهاتف</th><th>حالة ZR</th><th>تصبح</th><th>الشحن</th><th>الطلبية</th></tr>'
+  +ZR.rows.map((r,i)=>{const m=ZR.map[r.st]||'',lab=(M.find(x=>x[0]==m)||M[0])[1],cur=S.ord.find(o=>o.id==r.sel);
+   const opts='<option value="">— تجاهل —</option>'+S.ord.filter(o=>(r.cand||[]).includes(o.id)||o.id==r.sel).map(o=>'<option value="'+o.id+'" '+(o.id==r.sel?'selected':'')+'>'+esc(o.d+' | '+nm(S.box,o.box)+'×'+o.qty+' | '+(ST[o.st]||o.st)+' | '+fm(o.up))+'</option>').join('');
+   return '<tr><td>***'+esc((r.ph[0]||'').slice(-4))+'</td><td>'+esc(r.st)+'</td><td>'+lab+'</td><td>'+(isFinite(r.dp)?fm(r.dp):'?')+(ZR.opts.ship&&cur&&isFinite(r.dp)?'<br><small class="n">كان '+fm(cur.ship||0)+'</small>':'')+'</td><td><select onchange="zrSel('+i+',this.value)">'+opts+'</select></td></tr>'}).join('')
+  +'</table></div><p><small class="n">المطابقة تتم برقم التتبع إن وُجد، وإلا برقم الهاتف (آخر 9 أرقام). صف بلا طلبية مختارة لا يُطبَّق عليه شيء.</small></p>'
+  +'<p><button class="p" onclick="zrApply()">تطبيق على الطلبيات المحددة</button> <button onclick="zrClear()">إلغاء</button></p>'}
+ return h+'</details>'}
+
+function zrCred(){try{return{k:localStorage.getItem('logiciel_zr_key')||'',t:localStorage.getItem('logiciel_zr_tenant')||''}}catch(e){return{k:'',t:''}}}
+function zrTree(v,pre,out){
+ if(Array.isArray(v)){if(v.length&&v[0]&&typeof v[0]=='object')zrTree(v[0],pre+'[]',out);else out.push(pre+'[] : قائمة');return}
+ if(v&&typeof v=='object'){Object.keys(v).forEach(k=>zrTree(v[k],pre?pre+'.'+k:k,out));return}
+ out.push(pre+' : '+(v===null?'null':typeof v))}
+function zrForget(){try{localStorage.removeItem('logiciel_zr_key');localStorage.removeItem('logiciel_zr_tenant')}catch(e){}ZRC.out=['حُذف المفتاح المحفوظ من هذا الجهاز.'];render()}
+async function zrTest(){const k=val('zrk').trim(),t=val('zrt').trim();
+ if(!k||!t){ZRC.out=['اكتب المفتاح والـ Tenant ID أولًا.'];return render()}
+ if(ZRC.save){try{localStorage.setItem('logiciel_zr_key',k);localStorage.setItem('logiciel_zr_tenant',t)}catch(e){}}
+ ZRC.out=['جارٍ الاختبار…'];ZRC.busy=true;render();
+ const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);
+ try{
+  const r=await fetch('https://api.zrexpress.app/api/v1/parcels/search',{method:'POST',signal:ac.signal,headers:{'Content-Type':'application/json','Accept':'application/json','X-Api-Key':k,'X-Tenant':t},body:JSON.stringify({pageNumber:1,pageSize:1})});
+  const txt=await r.text();
+  if(r.status==401||r.status==403)ZRC.out=['رفض ZR الطلب ('+r.status+'): المفتاح أو Tenant ID غير صحيح، أو انتهت صلاحية المفتاح، أو لا يملك الصلاحية المطلوبة (SupplierParcelsManagerRole أو SupplierAdminRole).'];
+  else if(!r.ok)ZRC.out=['رد غير متوقع من ZR: '+r.status,txt.slice(0,200)];
+  else{let j;try{j=JSON.parse(txt)}catch(e){j=null}
+   if(!j)ZRC.out=['نجح الاتصال لكن الرد ليس JSON مقروءًا.'];
+   else{const o=['✔ نجح الاتصال والمتصفح سمح بالطلب.','إجمالي الطرود: '+j.totalCount+' | عدد الصفحات: '+j.totalPages+' | حجم الصفحة: '+j.pageSize,'أسماء الحقول في أول طرد (بلا قيم):'];
+    zrTree((j.items&&j.items[0])||{}, '', o);ZRC.out=o}}
+ }catch(e){ZRC.out=[e&&e.name=='AbortError'?'انتهت مهلة الاتصال (20 ثانية).':'تعذّر الاتصال. قد يكون المتصفح حجب الطلب من هذا الموقع (CORS) أو لا يوجد إنترنت. أرسل لي هذه الرسالة كما هي.']}
+ finally{clearTimeout(tm);ZRC.busy=false;render()}}
+function zrApiUi(){const c=zrCred();
+ return '<details class="card"'+(ZRC.out.length?' open':'')+'><summary><b>ربط ZR مباشر (تجريبي: اختبار الاتصال فقط)</b></summary>'
+ +'<p><small class="n">يقرأ طردًا واحدًا فقط من حسابك ولا يغيّر شيئًا. المفتاح لا يُحفظ في نسخ Drive ولا في ملفات النسخ الاحتياطي. من حسابك في ZR: API Rest ثم Token API لإنشاء المفتاح.</small></p>'
+ +'<div class="f"><div><label>Tenant ID</label><input id="zrt" value="'+esc(c.t)+'" autocomplete="off"></div><div><label>المفتاح السري (X-Api-Key)</label><input id="zrk" type="password" value="'+esc(c.k)+'" autocomplete="off"></div></div>'
+ +'<div><label style="display:inline"><input type="checkbox" style="width:auto" '+(ZRC.save?'checked':'')+' onchange="ZRC.save=this.checked"> احفظ المفتاح والمعرّف على هذا الجهاز فقط</label></div>'
+ +'<p><button class="p" onclick="zrTest()" '+(ZRC.busy?'disabled':'')+'>اختبار الاتصال</button> '+((c.k||c.t)?'<button class="d" onclick="zrForget()">حذف المفتاح المحفوظ</button>':'')+'</p>'
+ +(ZRC.out.length?'<pre style="white-space:pre-wrap;direction:ltr;text-align:left;font-size:12px">'+ZRC.out.map(esc).join('\n')+'</pre>':'')+'</details>'}
 const V={
 dash(){const r=day(dsel),m=dsel.slice(0,7);let mn=0;for(let i=1;i<=31;i++)mn+=day(m+'-'+String(i).padStart(2,'0')).net;
  const od=S.ord.filter(o=>o.d==dsel),by={},cs={};od.forEach(o=>{const b=nm(S.box,o.box);by[b]=(by[b]||0)+o.qty;cs[o.st]=(cs[o.st]||0)+1});
@@ -152,7 +235,7 @@ ord(){return `<div class="card"><h2>طلبية جديدة</h2><div class="f">${f
  <h2>حالة خاصة (زيادة/نقصان في العلبة)</h2><div class="f">${sel('vi','المنتج',opt(S.items))}${fld('vq','الكمية (+زيادة / −نقص)','number')}${fld('vp','فرق السعر','number')}<button onclick="addVr()">إضافة</button></div>
  ${tmp.vr.map((v,i)=>`<div>• ${esc(nm(S.items,v.item))} ${v.q>0?'+':''}${v.q} | سعر ${v.pr>0?'+':''}${v.pr} <button class="d" onclick="tmp.vr.splice(${i},1);render()">×</button></div>`).join('')}
  <p><button class="p" onclick="saveOrd()">حفظ الطلبية</button></p></div>
- ${S.ord.slice().reverse().map(o=>`<div class="card"><b>${esc(o.cust||'بدون اسم')}</b> ${esc(o.ph||'')} — ${esc(nm(S.box,o.box))} × ${o.qty}<br><small class="n">${o.d} | ${fm(o.up)} للعلبة | شحن ${fm(o.ship||0)} ${o.co?'| '+esc(o.co):''}${o.vr.length?' | حالات خاصة: '+o.vr.map(v=>esc(nm(S.items,v.item))+' '+v.q).join('، '):''}${o.rs?' | السبب: '+esc(o.rs):''}${o.st=='cancelled'&&o.cs?' | الشحن محتسب':''}</small><br>
+ ${zrUi()}${zrApiUi()}${S.ord.slice().reverse().map(o=>`<div class="card"><b>${esc(o.cust||'بدون اسم')}</b> ${esc(o.ph||'')} — ${esc(nm(S.box,o.box))} × ${o.qty}<br><small class="n">${o.d} | ${fm(o.up)} للعلبة | شحن ${fm(o.ship||0)} ${o.co?'| '+esc(o.co):''}${o.vr.length?' | حالات خاصة: '+o.vr.map(v=>esc(nm(S.items,v.item))+' '+v.q).join('، '):''}${o.rs?' | السبب: '+esc(o.rs):''}${o.st=='cancelled'&&o.cs?' | الشحن محتسب':''}${o.tn?' | تتبع '+esc(o.tn):''}</small><br>
  <select onchange="setSt('${o.id}',this.value)">${Object.keys(ST).map(k=>`<option value="${k}" ${k==o.st?'selected':''}>${ST[k]}</option>`).join('')}</select> ${dl('ord',o.id)}</div>`).join('')}`},
 box(){return `<div class="card"><h2>علبة جديدة</h2><div class="f">${fld('bn','اسم العلبة')}${fld('bp','سعر البيع','number')}</div><div class="f">${sel('bci','منتج',opt(S.items))}${fld('bcq','الكمية','number','value="1"')}<button onclick="addComp()">إضافة منتج</button></div>
  ${tmp.comp.map((c,i)=>`<div>• ${esc(nm(S.items,c.item))} × ${c.q} <button class="d" onclick="tmp.comp.splice(${i},1);render()">×</button></div>`).join('')}<p><button class="p" onclick="saveBox()">حفظ العلبة</button></p></div>
