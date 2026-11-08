@@ -60,6 +60,10 @@ function jr(){const E=[],A=(d,l,dr,cr,a)=>{if(a)E.push({d:d||'',l,dr,cr,a})};
   if(o.st=='returned'&&o.dmg)A(o.rd,'بضاعة مرجوعة تالفة','600','30',o.cost||0)});
  return E.sort((a,b)=>String(a.d).localeCompare(String(b.d)))}
 let tab='dash',dsel=today(),tmp={comp:[],vr:[]};
+const DR={};
+function clr(k){k.split(' ').forEach(x=>delete DR[x])}
+function restoreDrafts(){for(const k in DR){const e=document.getElementById(k);if(e&&e.value!==DR[k])e.value=DR[k]}}
+['input','change'].forEach(ev=>document.addEventListener(ev,e=>{const t=e.target;if(t&&t.id&&t.id!=='bx'&&t.type!=='file'&&t.closest&&t.closest('#app'))DR[t.id]=t.value},true));
 const TABS=[['dash','لوحة التحكم'],['ord','الطلبيات'],['box','العلب'],['stk','المشتريات والمخزون'],['sup','الموردون'],['exp','المصاريف والعمال'],['jrn','دفتر اليومية'],['bk','نسخة احتياطية']];
 
 const supBal=id=>S.pur.filter(p=>p.sup==id&&p.pm=='credit').reduce((a,p)=>a+p.q*p.p,0)+S.exp.filter(e=>e.sup==id&&e.pm=='credit').reduce((a,e)=>a+e.amt,0)-S.pay.filter(p=>p.sup==id).reduce((a,p)=>a+p.amt,0);
@@ -76,20 +80,20 @@ function addPur(){const n=val('pn'),q=num('pq'),p=num('pp'),pm=$('#ppm').value,s
  if(!n||q<=0||p<=0)return alert('أدخل الاسم والكمية والسعر');if(pm=='credit'&&!sp)return alert('اختر المورد للشراء على الحساب');
  let it=S.items.find(i=>i.name==n);if(!it){it={id:uid(),name:n,qty:0,cost:0};S.items.push(it)}
  it.cost=it.qty>0?(it.qty*it.cost+q*p)/(it.qty+q):p;it.qty+=q;
- S.pur.push({id:uid(),d:val('pd')||today(),item:it.id,q,p,pm,sup:pm=='credit'?sp:sp});save();render()}
-function addSup(){const n=val('sn');if(!n)return;S.sup.push({id:uid(),name:n,ph:val('sph')});save();render()}
-function paySup(){const s=$('#pys').value,a=num('pya');if(!s||a<=0)return alert('اختر المورد والمبلغ');S.pay.push({id:uid(),d:val('pyd')||today(),sup:s,amt:a});save();render()}
+ S.pur.push({id:uid(),d:val('pd')||today(),item:it.id,q,p,pm,sup:pm=='credit'?sp:sp});save();clr('pn pq pp ppm psp pd');render()}
+function addSup(){const n=val('sn');if(!n)return;S.sup.push({id:uid(),name:n,ph:val('sph')});save();clr('sn sph');render()}
+function paySup(){const s=$('#pys').value,a=num('pya');if(!s||a<=0)return alert('اختر المورد والمبلغ');S.pay.push({id:uid(),d:val('pyd')||today(),sup:s,amt:a});save();clr('pys pya pyd');render()}
 function addExp(){const a=num('ea'),pm=$('#epm').value,sp=$('#esp').value;if(a<=0)return alert('أدخل المبلغ');if(pm=='credit'&&!sp)return alert('اختر المورد');
- S.exp.push({id:uid(),d:val('ed')||today(),cat:$('#ec').value,ds:val('eds'),amt:a,pm,sup:sp});save();render()}
-function addWk(){const n=val('wn');if(!n)return;S.wk.push({id:uid(),name:n,wage:num('ww'),per:$('#wp').value});save();render()}
-function payWk(){const w=$('#wws').value,a=num('wwa');if(!w||a<=0)return alert('اختر العامل والمبلغ');S.wg.push({id:uid(),d:val('wwd')||today(),wk:w,amt:a,nt:val('wwn')});save();render()}
-function addComp(){const i=$('#bci').value,q=num('bcq');if(!i||q<=0)return alert('اختر منتجًا وكمية');tmp.comp.push({item:i,q});render()}
-function saveBox(){const n=val('bn');if(!n||!tmp.comp.length)return alert('أدخل الاسم وأضف منتجات');S.box.push({id:uid(),name:n,price:num('bp'),comp:tmp.comp});tmp.comp=[];save();render()}
-function addVr(){const i=$('#vi').value,q=num('vq');if(!i||!q)return alert('اختر منتجًا وكمية (سالبة للنقص)');tmp.vr.push({item:i,q,pr:num('vp')});render()}
+ S.exp.push({id:uid(),d:val('ed')||today(),cat:$('#ec').value,ds:val('eds'),amt:a,pm,sup:sp});save();clr('ed ec eds ea epm esp');render()}
+function addWk(){const n=val('wn');if(!n)return;S.wk.push({id:uid(),name:n,wage:num('ww'),per:$('#wp').value});save();clr('wn ww wp');render()}
+function payWk(){const w=$('#wws').value,a=num('wwa');if(!w||a<=0)return alert('اختر العامل والمبلغ');S.wg.push({id:uid(),d:val('wwd')||today(),wk:w,amt:a,nt:val('wwn')});save();clr('wws wwa wwd wwn');render()}
+function addComp(){const i=$('#bci').value,q=num('bcq');if(!i||q<=0)return alert('اختر منتجًا وكمية');tmp.comp.push({item:i,q});clr('bci bcq');render()}
+function saveBox(){const n=val('bn');if(!n||!tmp.comp.length)return alert('أدخل الاسم وأضف منتجات');S.box.push({id:uid(),name:n,price:num('bp'),comp:tmp.comp});tmp.comp=[];save();clr('bn bp bci bcq');render()}
+function addVr(){const i=$('#vi').value,q=num('vq');if(!i||!q)return alert('اختر منتجًا وكمية (سالبة للنقص)');tmp.vr.push({item:i,q,pr:num('vp')});clr('vi vq vp');render()}
 function saveOrd(){const b=S.box.find(x=>x.id==$('#ob').value),q=num('oq')||1;if(!b)return alert('أنشئ علبة أولًا');
  const up=num('oup')>0?num('oup'):b.price+tmp.vr.reduce((a,v)=>a+v.pr,0);
  const o={id:uid(),d:val('od')||today(),cust:val('oc'),ph:val('oph'),box:b.id,qty:q,vr:tmp.vr,up,ship:num('osh'),co:val('oco'),st:'new',ded:false,cost:0};
- S.cfg.co=o.co;S.ord.push(o);tmp.vr=[];save();render()}
+ S.cfg.co=o.co;S.ord.push(o);tmp.vr=[];save();clr('od oc oph ob oq oup osh oco vi vq vp');render()}
 function setSt(id,st){const o=S.ord.find(x=>x.id==id);if(st=='returned'||st=='cancelled'){o.rs=prompt('سبب الإرجاع أو الإلغاء؟')||'';o.dmg=st=='returned'&&confirm('هل البضاعة تالفة؟ (موافق = تالفة ولا تعود للمخزون)');if(st=='cancelled'){o.cs=confirm('هل أُلغيت الطلبية بعد أن وصل المنتج إلى الزبون؟\nموافق = نعم، تُحتسب تكلفة الشحن عليك.\nإلغاء = لا، الإلغاء قبل تجهيزها وذهابها لمكتب التوصيل، فلا يُحتسب شيء.');o.cd=today()}}
  if(st=='returned')o.rd=today();if(st=='delivered')o.dd=today();o.st=st;sync(o);save();render()}
 function rm(k,id){if(!confirm('تأكيد الحذف؟'))return;if(k=='pur'){const p=S.pur.find(x=>x.id==id),it=S.items.find(i=>i.id==p.item);if(it)it.qty-=p.q}
@@ -171,6 +175,6 @@ jrn(){const E=jr(),T={};E.forEach(e=>{(T[e.dr]=T[e.dr]||{d:0,c:0}).d+=e.a;(T[e.c
  <h2>دفتر اليومية (آخر 150 قيدًا)</h2>${tbl(['التاريخ','البيان','مدين','دائن','المبلغ'],E.slice(-150).reverse().map(e=>[e.d,esc(e.l),e.dr+' '+(AC[e.dr]||''),e.cr+' '+(AC[e.cr]||''),fm(e.a)]))}`},
 bk(){return `<div class="card"><p>تُحفظ بياناتك داخل هذا الجهاز (المتصفح). احتفظ بنسخة احتياطية دورية، فمسح بيانات المتصفح يحذفها.</p><p><b>نسخة احتياطية في Google Drive</b><br><button class="p" onclick="driveSave()">حفظ في Drive</button> <button onclick="driveRestore()">استعادة من Drive</button><br><label style="display:inline"><input type="checkbox" style="width:auto" ${gAutoOn()?'checked':''} onchange="gAutoToggle(this)"> حفظ تلقائي بعد كل تعديل (أثناء فتح التطبيق)</label><br><small class="n" id="gs">${(()=>{try{return localStorage.getItem('logiciel_drive_last')?'آخر حفظ: '+localStorage.getItem('logiciel_drive_last'):'لم تُحفظ نسخة بعد'}catch(e){return ''}})()}</small></p><p><button class="p" onclick="dlBackup()">تحميل نسخة (ملف)</button> <label style="display:inline">استيراد ملف: <input type="file" accept=".json" onchange="impFile(this)" style="width:auto"></label></p><p>نسخة احتياطية يدوية: انسخ النص أدناه واحتفظ به، ولصقه هنا للاستعادة.</p><textarea id="bx" rows="8"></textarea><p><button onclick="exportD()">تصدير</button> <button class="p" onclick="importD()">استيراد</button></p></div>`}
 };
-function render(){$('#nav').innerHTML=TABS.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('');$('#app').innerHTML=V[tab]()}
+function render(){$('#nav').innerHTML=TABS.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('');$('#app').innerHTML=V[tab]();restoreDrafts()}
 render();if(gAutoOn())setTimeout(()=>gBanner('الحفظ التلقائي مفعّل لكنه يحتاج تسجيل دخول لهذه الجلسة.'),600);try{if('serviceWorker' in navigator&&location.protocol.indexOf('http')==0)navigator.serviceWorker.register('sw.js')}catch(e){}
 </script></body></html>
