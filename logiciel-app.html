@@ -198,27 +198,49 @@ function zrTree(v,pre,out){
  out.push(pre+' : '+(v===null?'null':typeof v))}
 function zrForget(){try{localStorage.removeItem('logiciel_zr_key');localStorage.removeItem('logiciel_zr_tenant')}catch(e){}ZRC.out=['حُذف المفتاح المحفوظ من هذا الجهاز.'];render()}
 async function zrTest(){const k=val('zrk').trim(),t=val('zrt').trim();
- if(!k||!t){ZRC.out=['اكتب المفتاح والـ Tenant ID أولًا.'];return render()}
+ if(!k){ZRC.out=['اكتب المفتاح السري أولًا.'];return render()}
  if(ZRC.save){try{localStorage.setItem('logiciel_zr_key',k);localStorage.setItem('logiciel_zr_tenant',t)}catch(e){}}
  ZRC.out=['جارٍ الاختبار…'];ZRC.busy=true;render();
  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);
  try{
-  const r=await fetch('https://api.zrexpress.app/api/v1/parcels/search',{method:'POST',signal:ac.signal,headers:{'Content-Type':'application/json','Accept':'application/json','X-Api-Key':k,'X-Tenant':t},body:JSON.stringify({pageNumber:1,pageSize:1})});
+  const r=await fetch('https://api.zrexpress.app/api/v1/parcels/search',{method:'POST',signal:ac.signal,headers:Object.assign({'Content-Type':'application/json','Accept':'application/json','X-Api-Key':k},t?{'X-Tenant':t}:{}),body:JSON.stringify({pageNumber:1,pageSize:1})});
   const txt=await r.text();
   if(r.status==401||r.status==403)ZRC.out=['رفض ZR الطلب ('+r.status+'): المفتاح أو Tenant ID غير صحيح، أو انتهت صلاحية المفتاح، أو لا يملك الصلاحية المطلوبة (SupplierParcelsManagerRole أو SupplierAdminRole).'];
   else if(!r.ok)ZRC.out=['رد غير متوقع من ZR: '+r.status,txt.slice(0,200)];
   else{let j;try{j=JSON.parse(txt)}catch(e){j=null}
    if(!j)ZRC.out=['نجح الاتصال لكن الرد ليس JSON مقروءًا.'];
-   else{const o=['✔ نجح الاتصال والمتصفح سمح بالطلب.','إجمالي الطرود: '+j.totalCount+' | عدد الصفحات: '+j.totalPages+' | حجم الصفحة: '+j.pageSize,'أسماء الحقول في أول طرد (بلا قيم):'];
+   else{const o=['✔ نجح الاتصال والمتصفح سمح بالطلب'+(t?'.':' (بدون X-Tenant).'),'إجمالي الطرود: '+j.totalCount+' | عدد الصفحات: '+j.totalPages+' | حجم الصفحة: '+j.pageSize,'أسماء الحقول في أول طرد (بلا قيم):'];
     zrTree((j.items&&j.items[0])||{}, '', o);ZRC.out=o}}
+ }catch(e){ZRC.out=[e&&e.name=='AbortError'?'انتهت مهلة الاتصال (20 ثانية).':'تعذّر الاتصال. قد يكون المتصفح حجب الطلب من هذا الموقع (CORS) أو لا يوجد إنترنت. أرسل لي هذه الرسالة كما هي.']}
+ finally{clearTimeout(tm);ZRC.busy=false;render()}}
+
+async function zrProfile(){const k=val('zrk').trim();
+ if(!k){ZRC.out=['اكتب المفتاح السري أولًا.'];return render()}
+ ZRC.out=['جارٍ جلب الملف الشخصي…'];ZRC.busy=true;render();
+ const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);
+ try{
+  const r=await fetch('https://api.zrexpress.app/api/v1/users/profile',{method:'GET',signal:ac.signal,headers:{'Accept':'application/json','X-Api-Key':k}});
+  const txt=await r.text();
+  if(r.status==401||r.status==403)ZRC.out=['رفض ZR الطلب ('+r.status+'): المفتاح غير صحيح أو انتهت صلاحيته.'];
+  else if(!r.ok)ZRC.out=['رد غير متوقع من ZR: '+r.status,txt.slice(0,200)];
+  else{let j;try{j=JSON.parse(txt)}catch(e){j=null}
+   if(!j)ZRC.out=['نجح الاتصال لكن الرد ليس JSON مقروءًا.'];
+   else{const found=[];(function w(v,p){if(Array.isArray(v)){v.forEach((x,i)=>w(x,p+'['+i+']'));return}
+     if(v&&typeof v=='object'){Object.keys(v).forEach(kk=>w(v[kk],p?p+'.'+kk:kk));return}
+     if(/tenant/i.test(p)&&v!=null)found.push([p,String(v)])})(j,'');
+    const o=['✔ نجح الاتصال والمتصفح سمح بالطلب.'];
+    if(found.length){o.push('حقول متعلقة بـ Tenant (تظهر هنا في جهازك فقط، لا ترسلها لأحد):');found.forEach(f=>o.push(f[0]+' = '+f[1]));
+     if(found.length==1){DR.zrt=found[0][1];o.push('وُضعت القيمة في خانة Tenant ID.')}}
+    else{o.push('لا يوجد حقل باسم tenant في الرد. أسماء الحقول (بلا قيم):');zrTree(j,'',o)}
+    ZRC.out=o}}
  }catch(e){ZRC.out=[e&&e.name=='AbortError'?'انتهت مهلة الاتصال (20 ثانية).':'تعذّر الاتصال. قد يكون المتصفح حجب الطلب من هذا الموقع (CORS) أو لا يوجد إنترنت. أرسل لي هذه الرسالة كما هي.']}
  finally{clearTimeout(tm);ZRC.busy=false;render()}}
 function zrApiUi(){const c=zrCred();
  return '<details class="card"'+(ZRC.out.length?' open':'')+'><summary><b>ربط ZR مباشر (تجريبي: اختبار الاتصال فقط)</b></summary>'
  +'<p><small class="n">يقرأ طردًا واحدًا فقط من حسابك ولا يغيّر شيئًا. المفتاح لا يُحفظ في نسخ Drive ولا في ملفات النسخ الاحتياطي. من حسابك في ZR: API Rest ثم Token API لإنشاء المفتاح.</small></p>'
- +'<div class="f"><div><label>Tenant ID</label><input id="zrt" value="'+esc(c.t)+'" autocomplete="off"></div><div><label>المفتاح السري (X-Api-Key)</label><input id="zrk" type="password" value="'+esc(c.k)+'" autocomplete="off"></div></div>'
+ +'<div class="f"><div><label>Tenant ID (إن وجدته)</label><input id="zrt" value="'+esc(c.t)+'" autocomplete="off"></div><div><label>المفتاح السري (X-Api-Key)</label><input id="zrk" type="password" value="'+esc(c.k)+'" autocomplete="off"></div></div>'
  +'<div><label style="display:inline"><input type="checkbox" style="width:auto" '+(ZRC.save?'checked':'')+' onchange="ZRC.save=this.checked"> احفظ المفتاح والمعرّف على هذا الجهاز فقط</label></div>'
- +'<p><button class="p" onclick="zrTest()" '+(ZRC.busy?'disabled':'')+'>اختبار الاتصال</button> '+((c.k||c.t)?'<button class="d" onclick="zrForget()">حذف المفتاح المحفوظ</button>':'')+'</p>'
+ +'<p><button onclick="zrProfile()" '+(ZRC.busy?'disabled':'')+'>جلب Tenant ID من حسابي</button> <button class="p" onclick="zrTest()" '+(ZRC.busy?'disabled':'')+'>اختبار الاتصال</button> '+((c.k||c.t)?'<button class="d" onclick="zrForget()">حذف المفتاح المحفوظ</button>':'')+'</p>'
  +(ZRC.out.length?'<pre style="white-space:pre-wrap;direction:ltr;text-align:left;font-size:12px">'+ZRC.out.map(esc).join('\n')+'</pre>':'')+'</details>'}
 const V={
 dash(){const r=day(dsel),m=dsel.slice(0,7);let mn=0;for(let i=1;i<=31;i++)mn+=day(m+'-'+String(i).padStart(2,'0')).net;
